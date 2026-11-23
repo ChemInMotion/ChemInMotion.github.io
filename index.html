@@ -129,7 +129,69 @@ function sucrose(){
   (S[i].ord||[]).forEach(([a,b,o])=>{const x=m.get(key(a,b));if(x)x.o=o});Bs.push(m)}
  return{id:'sucrose',name:'Acid-catalysed hydrolysis of sucrose',cat:'Carbohydrate chemistry · Inversion',A,P,Bs,S,key};
 }
-const MECHS=[sucrose()]; // add more mechanisms here: each needs atoms, positions per step, bonds per step and step text
+function fin(id,name,cat,A,P,B0,S){const Bs=[new Map(B0.map(b=>[b[0]+'|'+b[1],{a:b[0],b:b[1],o:b[2],w:b[3]}]))],key=(a,b)=>Bs.some(m=>m.has(a+'|'+b))?a+'|'+b:b+'|'+a;
+ for(let i=1;i<S.length;i++){const m=new Map([...Bs[i-1]].map(([k,v])=>[k,{...v}]));
+  (S[i].brk||[]).forEach(([a,b])=>m.delete(key(a,b)));(S[i].form||[]).forEach(([a,b])=>m.set(a+'|'+b,{a,b,o:1,w:0}));
+  (S[i].ord||[]).forEach(([a,b,o])=>{const x=m.get(key(a,b));if(x)x.o=o});Bs.push(m)}
+ return{id,name,cat,A,P,Bs,S,key}}
+/* DNSA assay: reduction of the C3 nitro group of 3,5-dinitrosalicylic acid (9 steps) */
+function dnsa(){
+ const A={},B0=[],R=d=>d*Math.PI/180,D=a=>[Math.cos(R(a)),Math.sin(R(a))],pl=(c,r,d)=>[c[0]+r*Math.cos(R(d)),c[1]+r*Math.sin(R(d)),0],
+ add=(id,el,p,oh)=>A[id]={el,p,oh},bd=(a,b,o=1)=>B0.push([a,b,o,0]),of=(p,d,l,z=0)=>[p[0]+l*Math.cos(R(d)),p[1]+l*Math.sin(R(d)),p[2]+z];
+ [['r1',150],['r2',90],['r3',30],['r4',-30],['r5',-90],['r6',-150]].forEach(([id,a])=>add(id,'C',pl([0,0],1.4,a)));
+ [['r1','r2',2],['r2','r3'],['r3','r4',2],['r4','r5'],['r5','r6',2],['r6','r1']].forEach(([a,b,o])=>bd(a,b,o));
+ add('cc','C',of(A.r1.p,150,1.5));add('co1','O',of(A.cc.p,90,1.25,.2));add('co2','O',of(A.cc.p,200,1.35,-.2));bd('r1','cc');bd('cc','co1',2);bd('cc','co2');
+ add('po','O',of(A.r2.p,90,1.35));bd('r2','po');
+ add('n3','N',of(A.r3.p,30,1.45));add('n3a','O',of(A.n3.p,90,1.25,.2));add('n3b','O',of(A.n3.p,-30,1.25,-.2));bd('r3','n3');bd('n3','n3a',2);bd('n3','n3b');
+ add('n5','N',of(A.r5.p,-90,1.45));add('n5a','O',of(A.n5.p,210,1.25,.2));add('n5b','O',of(A.n5.p,330,1.25,-.2));bd('r5','n5');bd('n5','n5a',2);bd('n5','n5b');
+ add('Os1','O',[10,4,0]);add('Os2','O',[6,10,0]);add('Os3','O',[10,6,0]); // reducing-sugar enediolate oxygens
+ const W=(T,a,z)=>{const d=D(a),e=D(a+75),H=[T[0]+.97*d[0],T[1]+.97*d[1],T[2]+z],O=[H[0]+1.15*d[0],H[1]+1.15*d[1],H[2]],B=[O[0]+.8*e[0],O[1]+.8*e[1],H[2]];return{H,O,B,sh:[7*d[0],7*d[1],0]}};
+ const w=[0,W(A.n3a.p,150,.3),W(A.n3b.p,-30,.3),W(A.n3.p,90,.4),W(A.n3b.p,-30,.4),W(A.n3b.p,60,.4),W(A.n3.p,0,.4)];
+ const E=(k,s)=>{const o=w[k],t=s?o.sh:[0,0,0],f=p=>p.map((v,i)=>v+t[i]);return{['w'+k]:f(o.O),['h'+k]:f(o.H),['b'+k]:f(o.B)}};
+ for(let k=1;k<7;k++){const e=E(k,1);add('w'+k,'O',e['w'+k]);add('h'+k,'H',e['h'+k]);add('b'+k,'H',e['b'+k]);bd('w'+k,'h'+k);bd('w'+k,'b'+k)}
+ const P0={};for(const k in A)P0[k]=A[k].p;
+ const mv=(P,ids,d)=>{const n={...P};ids.forEach(i=>n[i]=P[i].map((v,j)=>v+d[j]));return n},sp=(P,o)=>({...P,...o}),L=(a,l)=>{const d=D(a);return[l*d[0],l*d[1],0]},SU=[4.12,2.38,.6];
+ const P1=sp(P0,{Os1:SU}),P2=sp(P1,{Os1:[11,3,0],...E(1,0)}),P3=mv(sp(P2,E(2,0)),['w1','b1'],L(150,8)),
+ P4=mv(mv(mv(P3,['w2','b2'],L(-30,.45)),['h2'],L(-30,.6)),['n3a','h1'],[-.9,1.4,0]),
+ P5=sp(mv(mv(P4,['n3a','h1'],L(150,8)),['w2','h2','b2'],L(-30,8)),{Os2:SU}),
+ P6=sp(P5,{Os2:[10,8,0],...E(3,0),...E(4,0)}),
+ P7=mv(mv(sp(P6,E(5,0)),['w3','b3'],L(90,8)),['w4','b4'],L(-30,8)),
+ P8=sp(mv(mv(P7,['w5','b5'],L(60,8)),['n3b','h4','h5'],[1.6,-.6,0]),{Os3:SU}),
+ P9=sp(mv(P8,['n3b','h4','h5'],L(-30,7)),{Os3:[6,10,0],...E(6,0)});
+ const bq=[['n5','+'],['n5b','-'],['po','-'],['co2','-']],c=[[-.5,.3,.8,1,.3],[-.35,.25,1.25,4,1.2],[-.2,.25,1.2,2.6,2.2],[-.25,.25,1.25,3.8,1.2],[.35,.25,1.2,3.2,1.6],[.3,.25,1.2,3.2,1.8],[-.3,.25,1.2,3.3,1.8],[-.3,.25,1.3,3.8,1.4],[.3,.25,1.3,3.6,1.5],[-.3,.25,1.3,3.3,1.5]];
+ const S=[
+ {n:'DNSA',t:'Starting material · the DNSA dianion',d:'3,5-Dinitrosalicylic acid (DNSA) in the alkaline reagent. The phenol and the carboxylic acid are both deprotonated, so the substrate is a dianion. The nitro group at C3, next to the phenoxide oxygen, is the one that will be reduced.',q:[['Os1','-'],['n3','+'],['n3b','-'],...bq],fl:[]},
+ {n:'Electron transfer',t:'Step 1 · Electron transfer to the nitro group',d:'The substrate is the DNSA dianion present in the alkaline reagent. A pair of electrons from the enediolate form of a reducing sugar goes to the nitrogen of the nitro group at C3, the one next to the phenoxide oxygen. That nitrogen is electron-poor because it carries a formal positive charge and is bonded to two oxygens, so it accepts the pair and the N=O π bond shifts onto oxygen. The product is a dianion with a lone pair on nitrogen and a negative charge on each oxygen. In practice this may happen as two one-electron transfers through a radical anion, but the net change is the same, so it is drawn as one pair.',
+  ord:[['n3','n3a',1]],glow:['Os1','n3','n3a','n3b'],lab:[['Os1','sugar enediolate']],dl:[['n3','+'],['Os1','-']],lp:['Os1'],q:[['n3a','-'],['n3b','-'],...bq],
+  fl:[['Os1','n3','The electron pair from the sugar enediolate transfers to the nitro nitrogen and becomes a lone pair there. The sugar is oxidized as it gives up the pair.'],[['n3','n3a'],'n3a','The N=O π electrons shift onto oxygen, giving Ar–N(O⁻)₂.']]},
+ {n:'First protonation',t:'Step 2 · First protonation',d:'The dianion is a strong base and takes a proton from water right away. One of the two oxygen anions is protonated, giving Ar–N(OH)(O⁻) and releasing hydroxide. The nitrogen lone pair is untouched and is used again in step 4.',
+  form:[['n3a','h1']],brk:[['w1','h1']],glow:['n3a','h1','w1'],halo:['w1'],lab:[['w1','OH⁻']],dl:[['h1','+'],['n3a','-']],lp:['n3a'],q:[['n3b','-'],['w1','-'],...bq],
+  fl:[['n3a','h1','A lone pair on one oxygen anion takes a hydrogen from water. The H–O bond electrons stay on the leaving hydroxide.']],fx:[[['w1','h1'],'w1',1]]},
+ {n:'Second protonation',t:'Step 3 · Second protonation',d:'The remaining oxygen anion is protonated the same way. This gives Ar–N(OH)₂, an N,N-dihydroxy compound that is formally the hydrate of a nitroso group. It is unstable and does not accumulate, but it sets up the loss of water in the next step.',
+  form:[['n3b','h2']],brk:[['w2','h2']],glow:['n3b','h2','w2'],halo:['w2'],lab:[['w2','OH⁻']],dl:[['h2','+'],['n3b','-']],lp:['n3b'],q:[['w2','-'],...bq],
+  fl:[['n3b','h2','A lone pair on the second oxygen anion takes a hydrogen from water. The H–O bond electrons stay on the leaving hydroxide.']],fx:[[['w2','h2'],'w2',1]]},
+ {n:'Nitroso formation',t:'Step 4 · Loss of water to form the nitroso group',d:'In the hot alkaline solution, hydroxide removes the proton from one of the two N–OH groups. The resulting oxygen anion pushes electrons back toward nitrogen to form an N=O double bond, and the other hydroxyl leaves as hydroxide. This finishes the first two-electron reduction, nitro to nitroso (Ar–N=O), which used two electrons and two protons and lost one water.',
+  form:[['w2','h2']],brk:[['n3b','h2'],['n3','n3a']],ord:[['n3','n3b',2]],glow:['w2','h2','n3b','n3','n3a'],halo:['n3a'],lab:[['n3a','OH⁻ leaves'],['w2','H₂O']],dl:[['n3','+'],['n3a','-']],lp:['w2','n3b'],q:[['Os2','-'],['n3a','-'],...bq],
+  fl:[['w2','h2','A lone pair on hydroxide takes the hydrogen from one N–OH. The O–H bond electrons stay on that oxygen.'],['n3b',['n3','n3b'],'A lone pair on that oxygen forms the N=O π bond.'],[['n3','n3a'],'n3a','The N–O σ electrons of the other hydroxyl leave with that oxygen as hydroxide.']],fx:[[['n3b','h2'],'n3b',1]]},
+ {n:'Second transfer',t:'Step 5 · Second electron transfer, to the nitroso group',d:'A second pair of electrons, from a different sugar molecule, goes to the nitroso nitrogen. The nitroso N=O bond is more electrophilic than the nitro group, so it is reduced faster than DNSA itself and never builds up. The N=O π electrons shift onto oxygen, giving the dianion Ar–N⁻–O⁻.',
+  ord:[['n3','n3b',1]],glow:['Os2','n3','n3b'],lab:[['Os2','sugar enediolate']],dl:[['n3','+'],['Os2','-']],lp:['Os2'],q:[['n3','-'],['n3b','-'],['n3a','-'],...bq],
+  fl:[['Os2','n3','The electron pair from a second sugar enediolate transfers to the nitroso nitrogen and becomes a second lone pair there.'],[['n3','n3b'],'n3b','The N=O π electrons shift onto oxygen, leaving a negative charge on nitrogen and on oxygen.']]},
+ {n:'Hydroxylamine formation',t:'Step 6 · Protonation to the hydroxylamine',d:'Both anionic sites are strong bases and are protonated by water. The nitrogen takes one proton and the oxygen takes the other, giving the hydroxylamine Ar–NH–OH. This completes the second two-electron reduction.',
+  form:[['n3','h3'],['n3b','h4']],brk:[['w3','h3'],['w4','h4']],glow:['n3','h3','w3','n3b','h4','w4'],halo:['w3','w4'],lab:[['w3','OH⁻'],['w4','OH⁻']],dl:[['h3','+'],['n3','-']],lp:['n3','n3b'],q:[['w3','-'],['w4','-'],...bq],
+  fl:[['n3','h3','A lone pair on nitrogen takes a hydrogen from water. The H–O bond electrons stay on the leaving hydroxide.'],['n3b','h4','A lone pair on oxygen takes a hydrogen from a second water molecule. The H–O bond electrons stay on the leaving hydroxide.']],fx:[[['w3','h3'],'w3',1],[['w4','h4'],'w4',2]]},
+ {n:'N–O activation',t:'Step 7 · Activation of the N–O bond',d:'Hydroxide is a poor leaving group, so before the N–O bond can break the hydroxyl oxygen has to be protonated. Water does this, giving Ar–NH–OH₂⁺. In hot base only a small fraction of the hydroxylamine is in this form at any moment, but the next step removes it quickly and pulls the equilibrium forward.',
+  form:[['n3b','h5']],brk:[['w5','h5']],glow:['n3b','h5','w5'],halo:['w5'],lab:[['w5','OH⁻']],dl:[['h5','+'],['n3b','-']],lp:['n3b'],q:[['n3b','+'],['w5','-'],['Os3','-'],...bq],
+  fl:[['n3b','h5','A lone pair on the hydroxyl oxygen takes a hydrogen from water. The H–O bond electrons stay on the leaving hydroxide.']],fx:[[['w5','h5'],'w5',1]]},
+ {n:'N–O cleavage',t:'Step 8 · Third electron transfer and N–O cleavage',d:'A third pair of electrons, from a third sugar molecule, goes to the nitrogen. As the pair arrives, the N–O bond breaks and the oxygen leaves as a neutral water molecule. What remains on nitrogen is an anion, Ar–NH⁻. This is the last of the six electrons needed to take nitrogen from the nitro oxidation level to the amine.',
+  brk:[['n3','n3b']],glow:['Os3','n3','n3b'],halo:['n3b'],lab:[['Os3','sugar enediolate'],['n3b','H₂O leaves']],dl:[['n3','+'],['Os3','-']],lp:['Os3'],q:[['n3','-'],...bq],
+  fl:[['Os3','n3','The electron pair from a third sugar enediolate transfers to the nitrogen.'],[['n3','n3b'],'n3b','The N–O σ electrons shift onto oxygen, and water leaves.']]},
+ {n:'Amine formation',t:'Step 9 · Final protonation to the amine',d:'The nitrogen anion is a very strong base and takes a proton from water at once. This gives the primary amine, Ar–NH₂, so the C3 nitro group has become an amino group. The ring now carries the amine at C3, the nitro group at C5 and the phenoxide and carboxylate from the alkaline medium, which together make up 3-amino-5-nitrosalicylic acid (ANSA).',
+  form:[['n3','h6']],brk:[['w6','h6']],glow:['n3','h6','w6'],halo:['w6'],lab:[['w6','OH⁻']],dl:[['h6','+'],['n3','-']],lp:['n3'],q:[['w6','-'],...bq],
+  fl:[['n3','h6','A lone pair on the nitrogen anion takes a hydrogen from water. The H–O bond electrons stay on the leaving hydroxide.']],fx:[[['w6','h6'],'w6',1]]}];
+ S.forEach((s,i)=>s.cam=c[i]);
+ return fin('dnsa','DNSA Assay','Analytical chemistry · Reducing sugar test',A,[P0,P1,P2,P3,P4,P5,P6,P7,P8,P9],B0,S)}
+
+const MECHS=[sucrose(),dnsa()]; // add more mechanisms here: each needs atoms, positions per step, bonds per step and step text
 /* ---------- state ---------- */
 const $=s=>document.querySelector(s),cv=$('#cv'),ctx=cv.getContext('2d');
 let M=MECHS[0],u=0,playing=false,hold=0,speed=1,labels=true,dim='3d',camMode='auto',W=0,H=0,dpr=1,time=0;
@@ -223,13 +285,13 @@ function render(){
   (S.dl||[]).forEach(([id,s])=>{const q=Q[id],r=R(id);ctx.globalAlpha=al;ctx.font='italic 600 16px "Segoe UI",Tahoma,sans-serif';ctx.fillStyle=s=='+'?BLU:ROSE;ctx.fillText(s=='+'?'δ+':'δ−',q.x+r*1.1+8,q.y-r*1.1-4)});
   (S.lab||[]).forEach(([id,tx])=>{const q=Q[id],r=R(id);ctx.globalAlpha=Math.max(0,Math.min(1,(f.t-.35)*3));ctx.font='italic 13px "Segoe UI",Tahoma,sans-serif';ctx.fillStyle='#e9c3cc';ctx.fillText(tx,q.x,q.y+r*1.6+14)});ctx.globalAlpha=1}
  // electron-flow arrows
- S.fl.forEach(([from,to],j)=>{const pt=r=>Array.isArray(r)?{x:(Q[r[0]].x+Q[r[1]].x)/2,y:(Q[r[0]].y+Q[r[1]].y)/2,a:0}:{x:Q[r].x,y:Q[r].y,a:1};
+ S.fl.map((f,j)=>[f[0],f[1],j+1]).concat(S.fx||[]).forEach(([from,to,num])=>{const pt=r=>Array.isArray(r)?{x:(Q[r[0]].x+Q[r[1]].x)/2,y:(Q[r[0]].y+Q[r[1]].y)/2,a:0}:{x:Q[r].x,y:Q[r].y,a:1};
   let s=pt(from),e=pt(to);const dx=e.x-s.x,dy=e.y-s.y,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,tr=d3?16:13;
   if(s.a){s={x:s.x+ux*tr,y:s.y+uy*tr}}if(e.a){e={x:e.x-ux*tr,y:e.y-uy*tr}}
   const nL=Math.hypot(e.x-s.x,e.y-s.y),nx=-(e.y-s.y)/(nL||1),ny=(e.x-s.x)/(nL||1),sg=ny>0?-1:1,bu=Math.max(28,nL*.35)*sg,cx=(s.x+e.x)/2+nx*bu,cy=(s.y+e.y)/2+ny*bu;
   ctx.globalAlpha=Math.min(1,f.t*4);ctx.strokeStyle=AMB;ctx.lineWidth=2.2;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.quadraticCurveTo(cx,cy,e.x,e.y);ctx.stroke();
   const an=Math.atan2(e.y-cy,e.x-cx);ctx.fillStyle=AMB;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(e.x-11*Math.cos(an-.4),e.y-11*Math.sin(an-.4));ctx.lineTo(e.x-11*Math.cos(an+.4),e.y-11*Math.sin(an+.4));ctx.fill();
-  const bx=(s.x+2*cx+e.x)/4,by=(s.y+2*cy+e.y)/4;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bx,by,9,0,7);ctx.fill();ctx.fillStyle='#000';ctx.font='bold 12px Verdana';ctx.fillText(j+1,bx,by+.5);ctx.globalAlpha=1});
+  const bx=(s.x+2*cx+e.x)/4,by=(s.y+2*cy+e.y)/4;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bx,by,9,0,7);ctx.fill();ctx.fillStyle='#000';ctx.font='bold 12px Verdana';ctx.fillText(num,bx,by+.5);ctx.globalAlpha=1});
  updateText(f.i,f.t)}
 /* ---------- loop ---------- */
 let last=performance.now();
